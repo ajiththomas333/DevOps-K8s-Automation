@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        AWS_DEFAULT_REGION = "ap-south-1"
+        AWS_DEFAULT_REGION = "us-east-1"   // Change if using another region
     }
 
     stages {
@@ -13,57 +13,21 @@ pipeline {
             }
         }
 
-        stage('Terraform Init') {
+        stage('Terraform') {
             steps {
-                dir('terraform') {
-                    sh 'terraform init'
+                withCredentials([
+                    string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    dir('terraform') {
+                        sh 'aws sts get-caller-identity'
+                        sh 'terraform init'
+                        sh 'terraform validate'
+                        sh 'terraform plan -out=tfplan'
+                        sh 'terraform apply -auto-approve tfplan'
+                    }
                 }
             }
         }
-
-        stage('Terraform Validate') {
-            steps {
-                dir('terraform') {
-                    sh 'terraform validate'
-                }
-            }
-        }
-
-        stage('Terraform Plan') {
-            steps {
-                dir('terraform') {
-                    sh 'terraform plan -out=tfplan'
-                }
-            }
-        }
-
-        stage('Terraform Apply') {
-            steps {
-                dir('terraform') {
-                    sh 'terraform apply -auto-approve tfplan'
-                }
-            }
-        }
-
-        stage('Terraform Output') {
-            steps {
-                dir('terraform') {
-                    sh 'terraform output'
-                }
-            }
-        }
-
-    }
-
-    post {
-
-        success {
-            echo 'Terraform deployment completed successfully.'
-        }
-
-        failure {
-            echo 'Terraform deployment failed.'
-        }
-
     }
 }
