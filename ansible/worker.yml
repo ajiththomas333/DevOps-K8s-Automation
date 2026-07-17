@@ -6,14 +6,6 @@
   tasks:
 
 
-  - name: Install kube packages
-    apt:
-      name:
-        - kubelet
-        - kubeadm
-      state: present
-
-
 
   - name: Copy join script
     copy:
