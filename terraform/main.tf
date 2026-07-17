@@ -23,7 +23,6 @@ EOF
 
 resource "aws_instance" "worker" {
 
-  count = 1
 
   ami           = var.ami
   instance_type = var.instance_type
@@ -42,6 +41,6 @@ chmod 600 /home/ubuntu/.ssh/authorized_keys
 EOF
 
   tags = {
-    Name = "k8s-worker-${count.index + 1}"
+    Name = "k8s-worker"
   }
 }
