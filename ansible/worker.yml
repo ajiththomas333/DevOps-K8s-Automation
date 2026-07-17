@@ -1,0 +1,32 @@
+---
+- hosts: worker
+  become: yes
+
+
+  tasks:
+
+
+  - name: Install kube packages
+    apt:
+      name:
+        - kubelet
+        - kubeadm
+      state: present
+
+
+
+  - name: Copy join script
+    copy:
+
+      src: /tmp/kubeadm_join.sh
+      dest: /tmp/kubeadm_join.sh
+
+
+
+  - name: Join worker node
+    command:
+
+      bash /tmp/kubeadm_join.sh
+
+    args:
+      creates: /etc/kubernetes/kubelet.conf
