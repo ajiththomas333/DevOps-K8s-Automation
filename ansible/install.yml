@@ -1,0 +1,15 @@
+---
+- name: Install Kubernetes Prerequisites
+  hosts: all
+  become: yes
+
+  tasks:
+
+    - name: Install kube packages
+      apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+        update_cache: yes
