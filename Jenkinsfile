@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         AWS_DEFAULT_REGION = "us-east-1"
+        ANSIBLE_HOST_KEY_CHECKING = "False"
     }
 
     stages {
@@ -19,32 +20,43 @@ pipeline {
                     string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')
                 ]) {
+
                     dir('terraform') {
-                        sh 'aws sts get-caller-identity'
+
                         sh 'terraform init'
+
                         sh 'terraform validate'
+
                         sh 'terraform plan -out=tfplan'
+
                         sh 'terraform apply -auto-approve tfplan'
                     }
                 }
             }
         }
 
-        stage('Generate Inventory') {
+        stage('Get Terraform Outputs') {
             steps {
                 script {
 
-                    def MASTER_IP = sh(
+                    MASTER_IP = sh(
                         script: 'cd terraform && terraform output -raw master_ip',
                         returnStdout: true
                     ).trim()
 
-                    def WORKER_IP = sh(
+                    WORKER_IP = sh(
                         script: 'cd terraform && terraform output -raw worker_ip',
                         returnStdout: true
                     ).trim()
+                }
+            }
+        }
 
-                    writeFile file: 'ansible/inventory.ini', text: """
+        stage('Generate Inventory') {
+            steps {
+
+                sh """
+                cat > ansible/inventory.ini << EOF
 [master]
 ${MASTER_IP}
 
@@ -54,18 +66,60 @@ ${WORKER_IP}
 [all:vars]
 ansible_user=ubuntu
 ansible_ssh_private_key_file=/var/lib/jenkins/.ssh/k8s_key
-"""
+EOF
+                """
+            }
+        }
+
+        stage('Add SSH Host Keys') {
+            steps {
+
+                sh """
+                mkdir -p /var/lib/jenkins/.ssh
+
+                ssh-keyscan -H ${MASTER_IP} >> /var/lib/jenkins/.ssh/known_hosts
+
+                ssh-keyscan -H ${WORKER_IP} >> /var/lib/jenkins/.ssh/known_hosts
+                """
+            }
+        }
+
+        stage('Ansible Kubernetes Setup') {
+            steps {
+
+                dir('ansible') {
+
+                    sh 'ansible-playbook -i inventory.ini site.yml'
+
                 }
             }
         }
 
-        stage('Ansible') {
+        stage('Verify Cluster') {
             steps {
-                dir('ansible') {
-                    sh 'ansible-playbook -i inventory.ini site.yml'
-                }
+
+                sh """
+                ssh -o StrictHostKeyChecking=no \
+                -i /var/lib/jenkins/.ssh/k8s_key \
+                ubuntu@${MASTER_IP} \
+                "kubectl get nodes"
+                """
+
             }
         }
 
     }
+
+    post {
+
+        success {
+            echo 'Kubernetes Cluster Created Successfully'
+        }
+
+        failure {
+            echo 'Pipeline Failed'
+        }
+
+    }
+
 }
