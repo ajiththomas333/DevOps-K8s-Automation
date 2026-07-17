@@ -5,15 +5,6 @@
   tasks:
 
 
-  - name: Install kube packages
-    apt:
-      name:
-        - kubelet
-        - kubeadm
-        - kubectl
-      state: present
-
-
   - name: Enable kubelet
     systemd:
       name: kubelet
