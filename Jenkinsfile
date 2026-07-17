@@ -40,7 +40,7 @@ pipeline {
                     ).trim()
 
                     def WORKER_IP = sh(
-                        script: 'cd terraform && terraform output -raw worker_ip',
+                        script: 'cd terraform && terraform output -raw worker_ips',
                         returnStdout: true
                     ).trim()
 
