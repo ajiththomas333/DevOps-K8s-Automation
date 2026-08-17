@@ -15,8 +15,11 @@
   become: yes
 
   tasks:
-    - name: Initialize Kubernetes Cluster
-      command: kubeadm init --pod-network-cidr=192.168.0.0/16
+  - name: Initialize Kubernetes Cluster
+    command: kubeadm init --pod-network-cidr=192.168.0.0/16
+    args:
+      creates: /etc/kubernetes/admin.conf
+    register: kubeadm_init
 
     # More master tasks...
 
