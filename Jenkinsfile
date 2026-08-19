@@ -5,7 +5,7 @@ pipeline {
         AWS_DEFAULT_REGION = "us-east-1"
         ANSIBLE_HOST_KEY_CHECKING = "False"
 
-        DOCKER_IMAGE = "YOUR_DOCKERHUB_USERNAME/html-app"
+        DOCKER_IMAGE = "ajiththomas10/html-app"
     }
 
     stages {
