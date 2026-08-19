@@ -4,31 +4,116 @@
   become: yes
 
   tasks:
+
+    - name: Run common Kubernetes setup
+      include_tasks: main.yml
+
+    - name: Create keyrings directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Install required packages
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gpg
+        state: present
+        update_cache: yes
+
+    - name: Add Kubernetes repository key
+      shell: |
+        curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.34/deb/Release.key |
+        gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+    - name: Add Kubernetes repository
+      apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.34/deb/ /"
+        state: present
+        filename: kubernetes
+
     - name: Update apt cache
       apt:
         update_cache: yes
 
-    # More installation tasks here...
+    - name: Install Kubernetes packages
+      apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+
+    - name: Hold Kubernetes packages
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+
 
 - name: Configure Kubernetes Master
   hosts: master
   become: yes
 
   tasks:
-  - name: Initialize Kubernetes Cluster
-    command: kubeadm init --pod-network-cidr=192.168.0.0/16
-    args:
-      creates: /etc/kubernetes/admin.conf
-    register: kubeadm_init
 
-    # More master tasks...
+    - name: Enable kubelet
+      systemd:
+        name: kubelet
+        enabled: yes
+
+    - name: Initialize Kubernetes Cluster
+      command: kubeadm init --pod-network-cidr=192.168.0.0/16
+      args:
+        creates: /etc/kubernetes/admin.conf
+
+    - name: Create kube directory
+      become_user: ubuntu
+      file:
+        path: /home/ubuntu/.kube
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Copy kube config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/ubuntu/.kube/config
+        remote_src: yes
+        owner: ubuntu
+        group: ubuntu
+        mode: '0600'
+
+    - name: Install Calico network
+      become_user: ubuntu
+      command: >
+        kubectl apply -f
+        https://raw.githubusercontent.com/projectcalico/calico/v3.30.3/manifests/calico.yaml
+
+    - name: Generate worker join command
+      command: kubeadm token create --print-join-command
+      register: kube_join_command
+
+    - name: Store join command
+      set_fact:
+        worker_join_command: "{{ kube_join_command.stdout }}"
+
 
 - name: Join Kubernetes Worker
   hosts: worker
   become: yes
 
   tasks:
-    - name: Join Worker to Cluster
-      command: "{{ hostvars[groups['master'][0]].kube_join_command }}"
 
-    # More worker tasks...
+    - name: Join Worker to Cluster
+      command: "{{ hostvars[groups['master'][0]]['worker_join_command'] }}"
+      args:
+        creates: /etc/kubernetes/kubelet.conf
