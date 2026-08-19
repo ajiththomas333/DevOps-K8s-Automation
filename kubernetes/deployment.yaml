@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: html-app
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: html-app
+
+  template:
+    metadata:
+      labels:
+        app: html-app
+
+    spec:
+      containers:
+        - name: html-app
+          image: ajiththomas333/html-app:latest
+          ports:
+            - containerPort: 80
